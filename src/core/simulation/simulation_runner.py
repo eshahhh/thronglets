@@ -1,15 +1,13 @@
+import os
 import time
 import random
 from pathlib import Path
 
 from ..config import load_configs, WorldConfig, SimulationConfig, ResourceConfig
-from ..world.location_graph import LocationGraph
-from ..world.world_state import WorldState
-from ..world.crafting_rules import CraftingRules
-from ..agents.agent_manager import AgentManager
-from ..actions.action_interpreter import ActionInterpreter
-from ..logging.event_logger import EventLogger, EventType, SnapshotManager
-from ..comm.message_bus import MessageBus
+from ..world import LocationGraph, WorldState, CraftingRules, AgentManager
+from ..actions import ActionInterpreter
+from ..logging import EventLogger, EventType, SnapshotManager
+from ..comm import MessageBus
 from .tick_engine import TickEngine, AgentActionProvider
 from .lifecycle_hooks import (
     LifecycleHookManager,
@@ -19,6 +17,13 @@ from .lifecycle_hooks import (
     SnapshotHook,
     StabilityCheckHook,
     HookPhase,
+)
+from ..cognition import (
+    LLMActionProvider,
+    ModelRegistry,
+    InferenceClient,
+    MemorySubsystem,
+    RoleInitializer,
 )
 
 
@@ -110,8 +115,11 @@ class SimulationResult:
 
 
 class SimulationAssembly:
-    def __init__(self, config_dir=None):
+    def __init__(self, config_dir=None, use_llm=False, live_logger=None, tick_observer=None):
         self.config_dir = config_dir
+        self.use_llm = use_llm
+        self.live_logger = live_logger
+        self.tick_observer = tick_observer
         self.world_config = None
         self.simulation_config = None
         self.resource_config = None
@@ -127,8 +135,14 @@ class SimulationAssembly:
         self.snapshot_manager = None
         self.hook_manager = None
         self.action_provider = None
+        
+        self.model_registry = None
+        self.inference_client = None
+        self.memory_subsystem = None
+        self.role_initializer = None
 
         self._initialized = False
+        self._tick_observer_wrapper = None
 
     def load_configs(self):
         configs = load_configs(self.config_dir)
@@ -228,14 +242,66 @@ class SimulationAssembly:
             crafting_rules=crafting_dict,
         )
 
-        self.action_provider = DummyActionProvider(
-            location_graph=self.location_graph,
-            agent_manager=self.agent_manager,
-        )
-        if self.simulation_config.random_seed:
-            self.action_provider.set_seed(self.simulation_config.random_seed)
+        if self.use_llm:
+            self._setup_llm_components()
+        else:
+            self.action_provider = DummyActionProvider(
+                location_graph=self.location_graph,
+                agent_manager=self.agent_manager,
+            )
+            if self.simulation_config.random_seed:
+                self.action_provider.set_seed(self.simulation_config.random_seed)
 
         return self
+
+    def _setup_llm_components(self):
+        api_key = os.getenv("API_KEY")
+        base_url = os.getenv("BASE_URL")
+        model_name = os.getenv("MODEL_NAME", "gpt-4o-mini")
+        
+        if not api_key:
+            raise ValueError("API_KEY environment variable not set")
+        
+        self.model_registry = ModelRegistry.create_single_model_registry(
+            model_name=model_name,
+            api_key=api_key,
+            base_url=base_url,
+            max_tokens=1024,
+            temperature=0.7,
+        )
+        
+        self.inference_client = InferenceClient(
+            default_api_key=api_key,
+            default_base_url=base_url,
+            max_retries=3,
+            retry_delay=1.0,
+            timeout=60.0,
+            live_logger=self.live_logger,
+        )
+        
+        self.memory_subsystem = MemorySubsystem(
+            short_term_capacity=50,
+            distill_interval=50,
+        )
+        
+        self.role_initializer = RoleInitializer(
+            seed=self.simulation_config.random_seed
+        )
+        
+        self.action_provider = LLMActionProvider(
+            agent_manager=self.agent_manager,
+            location_graph=self.location_graph,
+            message_bus=self.message_bus,
+            action_interpreter=self.action_interpreter,
+            model_registry=self.model_registry,
+            inference_client=self.inference_client,
+            memory_subsystem=self.memory_subsystem,
+            role_initializer=self.role_initializer,
+            batch_inference=False,
+            live_logger=self.live_logger,
+        )
+        
+        self.action_provider.initialize_all_agents()
 
     def setup_hooks(self):
         self.hook_manager = LifecycleHookManager()
@@ -285,12 +351,29 @@ class SimulationAssembly:
             action_interpreter=self.action_interpreter,
             event_logger=self.event_logger,
             action_provider=self.action_provider,
+            live_logger=self.live_logger,
         )
 
         if self.simulation_config.agent_order_randomize:
             self.tick_engine.agent_order_seed = self.simulation_config.random_seed or 42
 
         self.hook_manager.create_engine_hooks(self.tick_engine)
+
+        if self.tick_observer:
+            def _observer_hook(engine, tick, stats):
+                try:
+                    self.tick_observer(
+                        tick,
+                        stats,
+                        self.agent_manager,
+                        self.world_state,
+                        self.memory_subsystem,
+                    )
+                except Exception as exc:
+                    if self.live_logger:
+                        self.live_logger.warning(f"Tick observer failed: {exc}")
+            self._tick_observer_wrapper = _observer_hook
+            self.tick_engine.register_hook("after_tick_complete", self._tick_observer_wrapper)
 
         self._initialized = True
         return self
@@ -383,8 +466,8 @@ class SimulationAssembly:
             self.event_logger.close()
 
 
-def run_silently(config_dir=None, output_dir=None, num_ticks=None, agent_count=None):
-    assembly = SimulationAssembly(config_dir=config_dir)
+def run_silently(config_dir=None, output_dir=None, num_ticks=None, agent_count=None, use_llm=False, live_logger=None, tick_observer=None):
+    assembly = SimulationAssembly(config_dir=config_dir, use_llm=use_llm, live_logger=live_logger, tick_observer=tick_observer)
     try:
         assembly.initialize(output_dir=output_dir, agent_count=agent_count)
         result = assembly.run_silently(num_ticks=num_ticks)

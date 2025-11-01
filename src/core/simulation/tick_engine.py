@@ -3,8 +3,8 @@ from enum import Enum, auto
 
 from ..actions.action_interpreter import ActionInterpreter, ActionOutcome
 from ..actions.action_schema import BaseAction as Action, IdleAction
-from ..agents.agent_manager import AgentManager
-from ..logging.event_logger import EventLogger, EventType
+from ..agents import AgentManager
+from ..logging.event_logger import EventLogger, EventType, get_live_logger
 
 
 class TickPhase(Enum):
@@ -54,12 +54,14 @@ class AgentActionProvider:
 
 
 class TickEngine:
-    def __init__(self, world_state, agent_manager, action_interpreter, event_logger=None, action_provider=None):
+    def __init__(self, world_state, agent_manager, action_interpreter, event_logger=None, action_provider=None, enable_live_logging=True, live_logger=None):
         self.world_state = world_state
         self.agent_manager = agent_manager
         self.action_interpreter = action_interpreter
         self.event_logger = event_logger
         self.action_provider = action_provider or AgentActionProvider()
+        self.enable_live_logging = enable_live_logging
+        self._live_logger = live_logger if live_logger else get_live_logger()
 
         self._current_tick = 0
         self._running = False
@@ -73,6 +75,7 @@ class TickEngine:
             "before_agent_action": [],
             "after_agent_action": [],
             "world_update": [],
+            "after_tick_complete": [],
         }
 
         self._tick_history = []
@@ -186,12 +189,24 @@ class TickEngine:
         self._process_scheduled_events()
 
         agent_order = self._get_agent_order()
+        
+        if self.enable_live_logging:
+            self._live_logger.log_tick_start(self._current_tick, len(agent_order))
 
         for agent_id in agent_order:
             self._invoke_hooks("before_agent_action", self, self._current_tick, agent_id)
 
             action = self.action_provider.get_action(agent_id, self._current_tick)
             action.timestamp = time.time()
+            
+            if self.enable_live_logging:
+                action_details = self._get_action_details(action)
+                self._live_logger.log_action_execute(
+                    agent_id=agent_id,
+                    tick=self._current_tick,
+                    action_type=action.action_type.name,
+                    details=action_details,
+                )
 
             outcome = self.action_interpreter.execute(action)
             actions_executed += 1
@@ -200,6 +215,15 @@ class TickEngine:
                 actions_succeeded += 1
             else:
                 actions_failed += 1
+            
+            if self.enable_live_logging:
+                self._live_logger.log_action_result(
+                    agent_id=agent_id,
+                    tick=self._current_tick,
+                    action_type=action.action_type.name,
+                    success=outcome.succeeded,
+                    message=outcome.message,
+                )
 
             self._log_action_outcome(action, outcome)
 
@@ -220,6 +244,14 @@ class TickEngine:
             actions_succeeded,
             actions_failed,
         )
+        
+        if self.enable_live_logging:
+            self._live_logger.log_tick_end(
+                tick=self._current_tick,
+                duration_ms=duration_ms,
+                actions_executed=actions_executed,
+                actions_succeeded=actions_succeeded,
+            )
 
         if self.event_logger:
             self.event_logger.log_tick(
@@ -230,9 +262,31 @@ class TickEngine:
         if len(self._tick_history) > self._max_history:
             self._tick_history.pop(0)
 
+        self._invoke_hooks("after_tick_complete", self, self._current_tick, stats)
+
         self._current_tick += 1
 
         return stats
+    
+    def _get_action_details(self, action) -> dict:
+        details = {}
+        if hasattr(action, 'destination'):
+            details['dest'] = action.destination
+        if hasattr(action, 'resource_type'):
+            details['resource'] = action.resource_type
+            if hasattr(action, 'amount'):
+                details['amt'] = action.amount
+        if hasattr(action, 'target_agent_id'):
+            details['target'] = action.target_agent_id
+        if hasattr(action, 'recipe_id'):
+            details['recipe'] = action.recipe_id
+        if hasattr(action, 'recipient_id') and action.recipient_id:
+            details['recipient'] = action.recipient_id
+        if hasattr(action, 'content') and action.content:
+            details['msg'] = action.content[:30] + '...' if len(action.content) > 30 else action.content
+        if hasattr(action, 'reason') and action.reason:
+            details['reason'] = action.reason[:30] + '...' if len(action.reason) > 30 else action.reason
+        return details
 
     def _log_action_outcome(self, action, outcome):
         if not self.event_logger:

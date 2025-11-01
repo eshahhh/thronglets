@@ -80,6 +80,8 @@ class MessageAction(BaseAction):
     recipient_id: str = None
     channel: str = "direct"
     content: str = ""
+    location_id: str = None
+    group_id: str = None
 
     def validate(self):
         errors = []
@@ -87,7 +89,8 @@ class MessageAction(BaseAction):
             errors.append("agent_id is required")
         if not self.content:
             errors.append("content is required for MESSAGE action")
-        if self.channel not in ("direct", "location", "global"):
+        valid_channels = ("direct", "location", "global", "broadcast", "group", "trade", "governance")
+        if self.channel not in valid_channels:
             errors.append(f"invalid channel '{self.channel}' for MESSAGE action")
         if self.channel == "direct" and not self.recipient_id:
             errors.append("recipient_id is required for direct MESSAGE")
@@ -237,8 +240,13 @@ class ActionFactory:
 
         elif action_type == ActionType.MESSAGE:
             kwargs["recipient_id"] = data.get("recipient_id")
-            kwargs["channel"] = data.get("channel", "direct")
+            channel = data.get("channel", "direct")
+            if channel == "broadcast":
+                channel = "location"
+            kwargs["channel"] = channel
             kwargs["content"] = data.get("content", "")
+            kwargs["location_id"] = data.get("location_id")
+            kwargs["group_id"] = data.get("group_id")
 
         elif action_type == ActionType.TRADE_PROPOSAL:
             kwargs["target_agent_id"] = data.get("target_agent_id", "")
