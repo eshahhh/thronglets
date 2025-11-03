@@ -7,6 +7,7 @@ from .action_parser import ActionOutputParser
 from .memory import MemorySubsystem, ShortTermMemory, LongTermMemory
 from .llm_action_provider import LLMActionProvider
 from .role_initializer import RoleInitializer
+from .rate_limiter import RateLimiter
 
 __all__ = [
     "ObservationBuilder",
@@ -21,4 +22,5 @@ __all__ = [
     "LongTermMemory",
     "LLMActionProvider",
     "RoleInitializer",
+    "RateLimiter",
 ]

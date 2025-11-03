@@ -1,4 +1,5 @@
 import asyncio
+import time
 
 from ..simulation import AgentActionProvider
 from ..actions import BaseAction, IdleAction
@@ -9,6 +10,7 @@ from .inference_client import InferenceClient
 from .action_parser import ActionOutputParser
 from .memory import MemorySubsystem
 from .role_initializer import RoleInitializer
+from .rate_limiter import RateLimiter
 
 
 class LLMActionProvider(AgentActionProvider):
@@ -24,6 +26,8 @@ class LLMActionProvider(AgentActionProvider):
         role_initializer=None,
         batch_inference=False,
         live_logger=None,
+        rate_limiter=None,
+        inter_agent_delay=0.5,
     ):
         self.agent_manager = agent_manager
         self.location_graph = location_graph
@@ -35,6 +39,17 @@ class LLMActionProvider(AgentActionProvider):
         self.role_initializer = role_initializer or RoleInitializer()
         self.batch_inference = batch_inference
         self.live_logger = live_logger
+        self.inter_agent_delay = inter_agent_delay  # Delay between agent requests
+        
+        # Rate limiter for managing LLM request frequency
+        self.rate_limiter = rate_limiter or RateLimiter(
+            base_cooldown=5.0,
+            max_cooldown=120.0,
+            min_request_interval=0.5,
+            global_min_interval=0.2,
+            enable_mandatory_rest=True,
+            mandatory_rest_interval=10,
+        )
 
         self.observation_builder = ObservationBuilder(
             agent_manager=agent_manager,
@@ -58,6 +73,7 @@ class LLMActionProvider(AgentActionProvider):
         self._agent_roles = {}
         self._action_metadata = {}
         self._initialized_agents = set()
+        self._current_tick = 0
 
     def initialize_agent(
         self,
@@ -105,9 +121,38 @@ class LLMActionProvider(AgentActionProvider):
     def set_agent_role(self, agent_id, role):
         self._agent_roles[agent_id] = role
 
+    def set_tick(self, tick):
+        self._current_tick = tick
+        self.rate_limiter.set_tick(tick)
+
+    def is_night_mode(self):
+        return self.rate_limiter.is_night_mode()
+
     def get_action(self, agent_id, tick):
         if agent_id not in self._initialized_agents:
             self.initialize_agent(agent_id)
+        
+        self.set_tick(tick)
+        
+        can_request, reason = self.rate_limiter.can_make_request(agent_id)
+        if not can_request:
+            if self.live_logger:
+                self.live_logger.info(f"Agent {agent_id} rate limited: {reason}", agent_id=agent_id, tick=tick)
+            
+            # this is NOT an error (intentional throttling)
+            action = IdleAction(agent_id=agent_id, reason=f"Resting: {reason}")
+            self._action_metadata[agent_id] = {
+                "success": True,  # This is successful behavior, not an error
+                "rate_limited": True,
+                "reason": reason,
+                "is_rest": True,
+            }
+            return action
+        
+        self.rate_limiter.record_request_start(agent_id)
+        
+        if self.inter_agent_delay > 0:
+            time.sleep(self.inter_agent_delay)
 
         action, metadata = self.cognition.choose_action(
             agent_id=agent_id,
@@ -115,12 +160,28 @@ class LLMActionProvider(AgentActionProvider):
             agent_type=self._agent_types.get(agent_id),
             role=self._agent_roles.get(agent_id),
         )
+        
+        if metadata.get("success", False):
+            self.rate_limiter.record_request_success(agent_id)
+        else:
+            error_msg = metadata.get("error", "")
+            cooldown = self.rate_limiter.record_request_error(agent_id, error_msg)
+            if self.live_logger:
+                self.live_logger.warning(
+                    f"LLM error for {agent_id}, cooldown {cooldown:.1f}s: {error_msg}",
+                    agent_id=agent_id,
+                    tick=tick
+                )
+            metadata["llm_error"] = True
+            metadata["cooldown_applied"] = cooldown
 
         self._action_metadata[agent_id] = metadata
 
         return action
 
     def get_actions_batch(self, agent_ids, tick):
+        self.set_tick(tick)
+        
         for agent_id in agent_ids:
             if agent_id not in self._initialized_agents:
                 self.initialize_agent(agent_id)
@@ -248,6 +309,16 @@ class LLMActionProvider(AgentActionProvider):
     def get_inference_stats(self):
         return self.inference_client.get_stats()
 
+    def get_rate_limiter_status(self):
+        return self.rate_limiter.get_global_status()
+
+    def get_agent_rate_status(self, agent_id):
+        return self.rate_limiter.get_agent_status(agent_id)
+
+    def trigger_night_mode(self, duration_ticks=5):
+        self.rate_limiter.trigger_night_mode(duration_ticks)
+
     def reset_stats(self):
         self.cognition.reset_stats()
         self.inference_client.reset_stats()
+        self.rate_limiter.reset_all()

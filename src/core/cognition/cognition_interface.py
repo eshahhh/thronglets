@@ -87,9 +87,19 @@ class CognitionInterface:
             observation.get("available_actions", [])
         )
         
+        has_nearby_agents = len(observation.get("nearby_agents", [])) > 0
+        inventory_size = sum(observation.get("self", {}).get("inventory", {}).values())
+        most_urgent_need = observation.get("self", {}).get("most_urgent_need", "")
+        movement_hint = PromptTemplates.get_movement_hint(
+            has_nearby_agents=has_nearby_agents,
+            inventory_size=inventory_size,
+            most_urgent_need=most_urgent_need,
+        )
+        
         user_prompt = PromptTemplates.build_action_prompt(
             observation=observation_text,
             available_actions=available_actions_text,
+            movement_hint=movement_hint,
         )
         
         model_config = self.model_registry.get_model_for_agent(

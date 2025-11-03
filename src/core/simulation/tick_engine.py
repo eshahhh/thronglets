@@ -16,7 +16,7 @@ class TickPhase(Enum):
 
 
 class TickStats:
-    def __init__(self, tick, duration_ms, agents_processed, actions_executed, actions_succeeded, actions_failed, events_logged=0):
+    def __init__(self, tick, duration_ms, agents_processed, actions_executed, actions_succeeded, actions_failed, events_logged=0, llm_errors=0, agents_resting=0):
         self.tick = tick
         self.duration_ms = duration_ms
         self.agents_processed = agents_processed
@@ -24,6 +24,8 @@ class TickStats:
         self.actions_succeeded = actions_succeeded
         self.actions_failed = actions_failed
         self.events_logged = events_logged
+        self.llm_errors = llm_errors
+        self.agents_resting = agents_resting
 
     def to_dict(self):
         return {
@@ -34,6 +36,8 @@ class TickStats:
             "actions_succeeded": self.actions_succeeded,
             "actions_failed": self.actions_failed,
             "events_logged": self.events_logged,
+            "llm_errors": self.llm_errors,
+            "agents_resting": self.agents_resting,
         }
 
 
@@ -55,7 +59,7 @@ class AgentActionProvider:
 
 
 class TickEngine:
-    def __init__(self, world_state, agent_manager, action_interpreter, event_logger=None, action_provider=None, enable_live_logging=True, live_logger=None):
+    def __init__(self, world_state, agent_manager, action_interpreter, event_logger=None, action_provider=None, enable_live_logging=True, live_logger=None, tick_delay=0.0, min_tick_duration=1.0):
         self.world_state = world_state
         self.agent_manager = agent_manager
         self.action_interpreter = action_interpreter
@@ -63,6 +67,9 @@ class TickEngine:
         self.action_provider = action_provider or AgentActionProvider()
         self.enable_live_logging = enable_live_logging
         self._live_logger = live_logger if live_logger else get_live_logger()
+        
+        self.tick_delay = tick_delay
+        self.min_tick_duration = min_tick_duration
 
         self._current_tick = 0
         self._running = False
@@ -181,6 +188,8 @@ class TickEngine:
         actions_executed = 0
         actions_succeeded = 0
         actions_failed = 0
+        llm_errors = 0
+        agents_resting = 0
 
         if self.event_logger:
             self.event_logger.log_tick(self._current_tick, tick_start, is_start=True)
@@ -200,8 +209,25 @@ class TickEngine:
             action = self.action_provider.get_action(agent_id, self._current_tick)
             action.timestamp = time.time()
             
+            metadata = None
+            if hasattr(self.action_provider, 'get_last_action_metadata'):
+                metadata = self.action_provider.get_last_action_metadata(agent_id)
+            
+            is_rest = metadata.get("is_rest", False) if metadata else False
+            is_llm_error = metadata.get("llm_error", False) if metadata else False
+            
+            if is_rest:
+                agents_resting += 1
+            
+            if is_llm_error:
+                llm_errors += 1
+            
             if self.enable_live_logging:
                 action_details = self._get_action_details(action)
+                if is_rest:
+                    action_details['rest'] = True
+                if is_llm_error:
+                    action_details['llm_error'] = True
                 self._live_logger.log_action_execute(
                     agent_id=agent_id,
                     tick=self._current_tick,
@@ -212,7 +238,9 @@ class TickEngine:
             outcome = self.action_interpreter.execute(action)
             actions_executed += 1
 
-            if outcome.succeeded:
+            if is_llm_error:
+                actions_failed += 1
+            elif outcome.succeeded:
                 actions_succeeded += 1
             else:
                 actions_failed += 1
@@ -222,11 +250,11 @@ class TickEngine:
                     agent_id=agent_id,
                     tick=self._current_tick,
                     action_type=action.action_type.name,
-                    success=outcome.succeeded,
+                    success=outcome.succeeded and not is_llm_error,
                     message=outcome.message,
                 )
 
-            self._log_action_outcome(action, outcome)
+            self._log_action_outcome(action, outcome, is_llm_error=is_llm_error)
 
             self._invoke_hooks("after_agent_action", self, self._current_tick, agent_id, outcome)
 
@@ -236,6 +264,13 @@ class TickEngine:
 
         tick_end = time.time()
         duration_ms = (tick_end - tick_start) * 1000
+        
+        min_duration_ms = self.min_tick_duration * 1000
+        if duration_ms < min_duration_ms:
+            sleep_time = (min_duration_ms - duration_ms) / 1000
+            time.sleep(sleep_time)
+            tick_end = time.time()
+            duration_ms = (tick_end - tick_start) * 1000
 
         stats = TickStats(
             self._current_tick,
@@ -244,6 +279,8 @@ class TickEngine:
             actions_executed,
             actions_succeeded,
             actions_failed,
+            llm_errors=llm_errors,
+            agents_resting=agents_resting,
         )
         
         if self.enable_live_logging:
@@ -289,7 +326,7 @@ class TickEngine:
             details['reason'] = action.reason[:30] + '...' if len(action.reason) > 30 else action.reason
         return details
 
-    def _log_action_outcome(self, action, outcome):
+    def _log_action_outcome(self, action, outcome, is_llm_error=False):
         if not self.event_logger:
             return
 
@@ -305,6 +342,11 @@ class TickEngine:
         }
 
         event_type = event_type_map.get(action.action_type.name, EventType.INFO)
+        
+        if is_llm_error:
+            result_name = "LLM_ERROR"
+        else:
+            result_name = outcome.result.name
 
         self.event_logger.log(
             event_type=event_type,
@@ -312,9 +354,10 @@ class TickEngine:
             timestamp=action.timestamp,
             agent_id=action.agent_id,
             data={
-                "result": outcome.result.name,
+                "result": result_name,
                 "message": outcome.message,
                 "state_changes": outcome.state_changes,
+                "is_llm_error": is_llm_error,
             },
         )
 
@@ -338,6 +381,9 @@ class TickEngine:
                 stats = self.execute_tick()
                 stats_list.append(stats)
                 ticks_run += 1
+                
+                if self.tick_delay > 0:
+                    time.sleep(self.tick_delay)
 
         finally:
             self._running = False

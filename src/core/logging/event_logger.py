@@ -30,7 +30,8 @@ class EventType(Enum):
     ERROR = auto()
     WARNING = auto()
     INFO = auto()
-
+    LLM_ERROR = auto()
+    LLM_COOLDOWN = auto()
 
 class Event:
     def __init__(self, event_type, tick, timestamp, data=None, agent_id=None, location_id=None):
