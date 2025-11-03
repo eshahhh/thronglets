@@ -446,9 +446,14 @@ class SimulationManager:
                 [{"item_type": i.item_type, "quantity": i.quantity} for i in requested],
             )
             
+        agent_name = self._agent_names.get(agent_id, agent_id)
+        agent_type = self._agent_types.get(agent_id, "generalist")
+        
         event = {
             "tick": tick,
             "agent_id": agent_id,
+            "agent_name": agent_name,
+            "agent_type": agent_type,
             "type": action_type,
             "details": details,
             "success": outcome.succeeded,

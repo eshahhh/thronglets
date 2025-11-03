@@ -32,6 +32,7 @@ def get_config():
 @asynccontextmanager
 async def lifespan(app):
     global simulation
+    ws_manager.set_event_loop(asyncio.get_running_loop())
     yield
     if simulation:
         simulation.cleanup()
@@ -145,9 +146,15 @@ def create_app():
         
         def on_tick(sim, tick, stats):
             state = sim.get_state()
+            metrics = sim.get_metrics()
+            events = sim.get_events(100)
             ws_manager.broadcast_sync({
-                "type": "state",
-                "data": state,
+                "type": "tick",
+                "data": {
+                    "state": state,
+                    "metrics": metrics,
+                    "events": events,
+                }
             })
             
         simulation.add_tick_callback(on_tick)
@@ -167,9 +174,18 @@ def create_app():
         await ws_manager.connect(websocket)
         
         try:
-            if simulation:
+            if simulation and simulation._initialized:
                 state = simulation.get_state()
-                await websocket.send_json({"type": "state", "data": state})
+                metrics = simulation.get_metrics()
+                events = simulation.get_events(100)
+                await websocket.send_json({
+                    "type": "tick",
+                    "data": {
+                        "state": state,
+                        "metrics": metrics,
+                        "events": events,
+                    }
+                })
                 
             while True:
                 data = await websocket.receive_json()
