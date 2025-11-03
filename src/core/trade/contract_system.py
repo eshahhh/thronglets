@@ -29,7 +29,7 @@ class ContractObligation:
     parameters: dict
     due_tick: int
     fulfilled: bool = False
-    fulfilled_tick = None
+    fulfilled_tick: int = None
 
     def to_dict(self):
         return {
@@ -51,9 +51,9 @@ class Contract:
     created_tick: int
     expiry_tick: int
     status: ContractStatus = ContractStatus.DRAFT
-    reputation_stakes = field(default_factory=dict)
+    reputation_stakes: dict = field(default_factory=dict)
     terms: str = ""
-    witnesses = field(default_factory=list)
+    witnesses: list = field(default_factory=list)
     breach_penalty: float = 10.0
 
     def to_dict(self):

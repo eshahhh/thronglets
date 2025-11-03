@@ -5,7 +5,7 @@ from .event_logger import (
     StateSnapshot,
     SnapshotManager,
 )
-from .live_logger import LiveLogger
+from .live_logger import LiveLogger, get_live_logger
 
 __all__ = [
     "EventType",
@@ -14,4 +14,5 @@ __all__ = [
     "StateSnapshot",
     "SnapshotManager",
     "LiveLogger",
+    "get_live_logger",
 ]

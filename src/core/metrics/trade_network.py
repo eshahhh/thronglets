@@ -4,13 +4,13 @@ from collections import defaultdict
 
 @dataclass
 class TradeEdge:
-    source = ""
-    target = ""
-    weight = 1
-    total_volume = 0.0
-    items_traded = field(default_factory=dict)
-    first_trade_tick = 0
-    last_trade_tick = 0
+    source: str = ""
+    target: str = ""
+    weight: int = 1
+    total_volume: float = 0.0
+    items_traded: dict = field(default_factory=dict)
+    first_trade_tick: int = 0
+    last_trade_tick: int = 0
 
     def to_dict(self):
         return {
@@ -26,8 +26,8 @@ class TradeEdge:
 
 @dataclass
 class TradeGraph:
-    nodes = set()
-    edges = dict()
+    nodes: set = field(default_factory=set)
+    edges: dict = field(default_factory=dict)
 
     def get_degree(self, node):
         count = 0
