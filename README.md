@@ -1,10 +1,10 @@
 # Thronglets
 
-An experiment in emergent economics: 5-10 LLM-powered agents in a resource-limited world with no hard-coded economic rules.
+An experiment in emergent economics: LLM-powered agents in a resource-limited world with no hard-coded economic rules.
 
 ## Hypothesis
 
-LLM agents placed in resource-limited environments will spontaneously create markets, currencies, specialization, and institutions through natural language negotiation and planning.
+LLM agents placed in resource-limited environments will create markets, currencies, specialization, and institutions through natural language negotiation and planning as a show of emergent behavior.
 
 ## What We're Looking For
 
@@ -15,17 +15,56 @@ LLM agents placed in resource-limited environments will spontaneously create mar
 - Price convergence patterns
 - Wealth inequality & economic cycles
 
-## Setup
+## Quick Start
+
+### Demo Mode (No LLM Required)
 
 ```bash
 pip install -r requirements.txt
+cd server
+python demo_server.py
 ```
+
+Open http://localhost:8000 or run the frontend separately.
+
+### LLM Mode
 
 ```bash
-python run_dashboard.py --ticks 10000 --agents 100 --llm
+cd server
+python main.py --agents 12 --llm
 ```
 
-Make sure to set your api key in .env
+Make sure to set your API key in `.env`:
+```
+API_KEY=your_api_key
+BASE_URL=your_base_url  # optional
+MODEL_NAME=gpt-4o-mini
+```
 
-# About
-I did use AI to generate the scaffolding for the project, I kinda wanted to have a nice research heavy project but didnt know how to structure for it. I wanted to make it winter themed but I already spent too much time on this and Im very tired so Ill do the theming and all my future changes next week. This is inspired by blackmirror thronglets episode!
+### Frontend (Development)
+
+```bash
+cd frontend
+npm install
+npm run dev
+```
+
+Open http://localhost:5173 in your browser.
+
+## Features
+
+- Real-time 2D visualization with gamified map view
+- Named agents
+- Agent detail panel with inventory, needs, and reasoning for action
+- Events log
+- Statistics overlay with charts:
+  - Agent type distribution
+  - Trade volume over time
+  - Wealth inequality (Gini coefficient)
+  - Action distribution
+  - Trade network metrics
+- WebSocket live updates
+
+## About
+
+This project is inspired by the Black Mirror Thronglets episode!

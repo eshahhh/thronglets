@@ -11,9 +11,10 @@ httpx
 numpy
 networkx
 
-# Dashboard
+# Server
 fastapi>=0.100
 uvicorn>=0.20
+websockets
 
 # Testing
 pytest
