@@ -1,0 +1,13 @@
+# Core
+pydantic>=2.0
+
+# LLM
+openai>=1.0
+httpx
+
+# Data & Analysis
+numpy
+networkx
+
+# Testing
+pytest
