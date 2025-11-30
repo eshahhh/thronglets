@@ -19,6 +19,13 @@ from .lifecycle_hooks import (
     StabilityCheckHook,
 )
 
+from .simulation_runner import (
+    SimulationAssembly,
+    SimulationResult,
+    DummyActionProvider,
+    run_silently,
+)
+
 __all__ = [
     "TickEngine",
     "TickPhase",
@@ -35,4 +42,8 @@ __all__ = [
     "InventoryDecayHook",
     "SnapshotHook",
     "StabilityCheckHook",
+    "SimulationAssembly",
+    "SimulationResult",
+    "DummyActionProvider",
+    "run_silently",
 ]

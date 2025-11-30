@@ -2,7 +2,7 @@ import time
 from enum import Enum, auto
 
 from ..actions.action_interpreter import ActionInterpreter, ActionOutcome
-from ..actions.action_schema import Action, IdleAction
+from ..actions.action_schema import BaseAction as Action, IdleAction
 from ..agents.agent_manager import AgentManager
 from ..logging.event_logger import EventLogger, EventType
 
