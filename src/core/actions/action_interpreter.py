@@ -1,7 +1,7 @@
 from enum import Enum, auto
 
 from .action_schema import (
-    Action,
+    BaseAction as Action,
     ActionType,
     MoveAction,
     HarvestAction,

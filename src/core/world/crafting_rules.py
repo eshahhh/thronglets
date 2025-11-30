@@ -7,7 +7,7 @@ class Recipe:
     name: str
     inputs: dict = field(default_factory=dict)
     outputs: dict = field(default_factory=dict)
-    time_cost = 1.0
+    time_cost: float = 1.0
     skill_requirements: dict = field(default_factory=dict)
     tool_requirements: list = field(default_factory=list)
     skill_bonuses: dict = field(default_factory=dict)

@@ -11,7 +11,6 @@ from .action_schema import (
     GroupActionType,
     IdleAction,
     TradeItem,
-    Action,
     ActionValidator,
     ActionFactory,
 )
@@ -21,6 +20,8 @@ from .action_interpreter import (
     ActionOutcome,
     ActionInterpreter,
 )
+
+Action = BaseAction
 
 __all__ = [
     "ActionType",

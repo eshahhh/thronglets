@@ -1,0 +1,150 @@
+locations:
+  - id: forest_north
+    name: Northern Forest
+    type: forest
+    resources:
+      wood: 100
+      berries: 50
+      herbs: 20
+    access_cost: 1.0
+    attributes:
+      danger_level: 2
+      shelter_quality: 30
+
+  - id: forest_south
+    name: Southern Forest
+    type: forest
+    resources:
+      wood: 80
+      berries: 70
+      mushrooms: 30
+    access_cost: 1.0
+    attributes:
+      danger_level: 1
+      shelter_quality: 40
+
+  - id: river_crossing
+    name: River Crossing
+    type: river
+    resources:
+      fish: 100
+      water: 999
+      clay: 40
+    access_cost: 1.5
+    attributes:
+      danger_level: 3
+      shelter_quality: 10
+
+  - id: mountain_base
+    name: Mountain Base
+    type: mountain
+    resources:
+      stone: 150
+      ore: 60
+      gems: 10
+    access_cost: 2.0
+    attributes:
+      danger_level: 4
+      shelter_quality: 50
+
+  - id: plains_central
+    name: Central Plains
+    type: plains
+    resources:
+      grain: 120
+      hay: 80
+      clay: 20
+    access_cost: 0.5
+    attributes:
+      danger_level: 1
+      shelter_quality: 20
+
+  - id: village_square
+    name: Village Square
+    type: settlement
+    resources:
+      water: 50
+    access_cost: 0.3
+    attributes:
+      danger_level: 0
+      shelter_quality: 80
+      is_trading_hub: true
+
+  - id: cave_system
+    name: Deep Caves
+    type: cave
+    resources:
+      ore: 100
+      gems: 30
+      stone: 80
+    access_cost: 2.5
+    attributes:
+      danger_level: 5
+      shelter_quality: 60
+
+  - id: coastal_area
+    name: Coastal Shore
+    type: coast
+    resources:
+      fish: 150
+      salt: 60
+      shells: 40
+    access_cost: 1.2
+    attributes:
+      danger_level: 2
+      shelter_quality: 15
+
+edges:
+  - from: forest_north
+    to: plains_central
+    distance: 2.0
+    difficulty: 1.0
+    bidirectional: true
+
+  - from: forest_south
+    to: plains_central
+    distance: 1.5
+    difficulty: 1.0
+    bidirectional: true
+
+  - from: plains_central
+    to: village_square
+    distance: 1.0
+    difficulty: 0.5
+    bidirectional: true
+
+  - from: plains_central
+    to: river_crossing
+    distance: 2.0
+    difficulty: 1.2
+    bidirectional: true
+
+  - from: river_crossing
+    to: coastal_area
+    distance: 3.0
+    difficulty: 1.5
+    bidirectional: true
+
+  - from: village_square
+    to: mountain_base
+    distance: 3.0
+    difficulty: 1.8
+    bidirectional: true
+
+  - from: mountain_base
+    to: cave_system
+    distance: 1.5
+    difficulty: 2.0
+    bidirectional: true
+
+  - from: forest_north
+    to: mountain_base
+    distance: 4.0
+    difficulty: 2.5
+    bidirectional: true
+
+  - from: coastal_area
+    to: village_square
+    distance: 2.5
+    difficulty: 1.0
+    bidirectional: true

@@ -1,0 +1,75 @@
+defaults:
+  capacity: 100
+  starting_needs:
+    food: 100.0
+    shelter: 100.0
+    reputation: 50.0
+  starting_skills: {}
+  starting_inventory: {}
+
+spawn:
+  count: 100
+  locations:
+    - village_square
+    - plains_central
+    - forest_north
+    - forest_south
+  distribution: random
+  name_prefix: Agent
+
+archetypes:
+  - id: gatherer
+    weight: 30
+    capacity: 120
+    starting_skills:
+      foraging: 2
+      herbalism: 1
+    preferred_locations:
+      - forest_north
+      - forest_south
+
+  - id: fisher
+    weight: 20
+    capacity: 100
+    starting_skills:
+      fishing: 2
+    preferred_locations:
+      - river_crossing
+      - coastal_area
+
+  - id: miner
+    weight: 15
+    capacity: 80
+    starting_skills:
+      mining: 2
+      smithing: 1
+    preferred_locations:
+      - mountain_base
+      - cave_system
+
+  - id: crafter
+    weight: 20
+    capacity: 100
+    starting_skills:
+      crafting: 2
+      cooking: 1
+    preferred_locations:
+      - village_square
+
+  - id: trader
+    weight: 15
+    capacity: 150
+    starting_skills:
+      negotiation: 2
+    starting_inventory:
+      shells: 5
+    preferred_locations:
+      - village_square
+
+behavior:
+  hunger_threshold: 30
+  shelter_threshold: 20
+  rest_probability: 0.1
+  explore_probability: 0.2
+  trade_willingness: 0.5
+  group_join_probability: 0.3

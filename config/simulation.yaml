@@ -1,0 +1,62 @@
+tick_rate: 1.0
+
+termination:
+  max_ticks: 10000
+  min_agents: 1
+  conditions:
+    - type: tick_limit
+      value: 10000
+    - type: agent_extinction
+      threshold: 0
+
+warmup:
+  enabled: true
+  ticks: 10
+
+snapshots:
+  enabled: true
+  interval: 100
+  compress: true
+  max_snapshots: 50
+  output_dir: output/snapshots
+
+logging:
+  enabled: true
+  output_path: output/events.jsonl
+  buffer_size: 1000
+  compress: false
+  store_in_memory: true
+
+agent_settings:
+  initial_count: 100
+  capacity: 100
+  starting_needs:
+    food: 100.0
+    shelter: 100.0
+    reputation: 50.0
+  spawn_locations:
+    - village_square
+    - plains_central
+    - forest_north
+    - forest_south
+  name_prefix: Agent
+
+need_decay:
+  food: 1.0
+  shelter: 0.5
+
+hooks:
+  resource_regeneration:
+    enabled: true
+    priority: 10
+  need_decay:
+    enabled: true
+    priority: 5
+  stability_check:
+    enabled: true
+    priority: 1
+    min_agents: 1
+    max_tick_duration_ms: 10000.0
+
+random_seed: 42
+agent_order_randomize: true

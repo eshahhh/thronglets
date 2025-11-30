@@ -1,0 +1,285 @@
+resources:
+  - id: wood
+    name: Wood
+    category: raw_material
+    base_value: 2
+    stack_size: 50
+    decay_rate: 0.0
+
+  - id: stone
+    name: Stone
+    category: raw_material
+    base_value: 3
+    stack_size: 30
+    decay_rate: 0.0
+
+  - id: ore
+    name: Iron Ore
+    category: raw_material
+    base_value: 8
+    stack_size: 20
+    decay_rate: 0.0
+
+  - id: gems
+    name: Gems
+    category: valuable
+    base_value: 50
+    stack_size: 10
+    decay_rate: 0.0
+
+  - id: fish
+    name: Fish
+    category: food
+    base_value: 5
+    stack_size: 20
+    decay_rate: 0.1
+    food_value: 25
+
+  - id: berries
+    name: Berries
+    category: food
+    base_value: 2
+    stack_size: 30
+    decay_rate: 0.15
+    food_value: 10
+
+  - id: grain
+    name: Grain
+    category: food
+    base_value: 3
+    stack_size: 40
+    decay_rate: 0.02
+    food_value: 15
+
+  - id: water
+    name: Water
+    category: consumable
+    base_value: 1
+    stack_size: 20
+    decay_rate: 0.0
+
+  - id: herbs
+    name: Herbs
+    category: ingredient
+    base_value: 4
+    stack_size: 25
+    decay_rate: 0.05
+
+  - id: clay
+    name: Clay
+    category: raw_material
+    base_value: 2
+    stack_size: 40
+    decay_rate: 0.0
+
+  - id: salt
+    name: Salt
+    category: preservative
+    base_value: 6
+    stack_size: 30
+    decay_rate: 0.0
+
+  - id: shells
+    name: Shells
+    category: decorative
+    base_value: 3
+    stack_size: 50
+    decay_rate: 0.0
+
+  - id: mushrooms
+    name: Mushrooms
+    category: food
+    base_value: 4
+    stack_size: 25
+    decay_rate: 0.2
+    food_value: 12
+
+  - id: hay
+    name: Hay
+    category: material
+    base_value: 1
+    stack_size: 60
+    decay_rate: 0.01
+
+regeneration:
+  rates:
+    wood: 5.0
+    stone: 1.0
+    ore: 0.5
+    gems: 0.1
+    fish: 10.0
+    berries: 8.0
+    grain: 3.0
+    water: 50.0
+    herbs: 4.0
+    clay: 2.0
+    salt: 1.0
+    shells: 3.0
+    mushrooms: 6.0
+    hay: 5.0
+
+  caps:
+    wood: 200
+    stone: 200
+    ore: 100
+    gems: 50
+    fish: 200
+    berries: 150
+    grain: 200
+    water: 999
+    herbs: 80
+    clay: 100
+    salt: 100
+    shells: 100
+    mushrooms: 100
+    hay: 150
+
+recipes:
+  - id: plank
+    name: Wooden Plank
+    inputs:
+      wood: 2
+    outputs:
+      plank: 4
+    time_cost: 1.0
+    skill_requirements: {}
+    tool_requirements: []
+    skill_bonuses:
+      woodworking: 0.1
+
+  - id: bread
+    name: Bread
+    inputs:
+      grain: 3
+      water: 1
+    outputs:
+      bread: 2
+    time_cost: 2.0
+    skill_requirements:
+      cooking: 1
+    tool_requirements: []
+    skill_bonuses:
+      cooking: 0.15
+    food_value: 40
+
+  - id: iron_ingot
+    name: Iron Ingot
+    inputs:
+      ore: 3
+      wood: 2
+    outputs:
+      iron_ingot: 1
+    time_cost: 3.0
+    skill_requirements:
+      smithing: 2
+    tool_requirements: []
+    skill_bonuses:
+      smithing: 0.2
+
+  - id: simple_tool
+    name: Simple Tool
+    inputs:
+      wood: 2
+      stone: 1
+    outputs:
+      simple_tool: 1
+    time_cost: 2.0
+    skill_requirements: {}
+    tool_requirements: []
+    skill_bonuses:
+      crafting: 0.1
+
+  - id: rope
+    name: Rope
+    inputs:
+      hay: 5
+    outputs:
+      rope: 2
+    time_cost: 1.5
+    skill_requirements: {}
+    tool_requirements: []
+    skill_bonuses:
+      crafting: 0.05
+
+  - id: pottery
+    name: Pottery
+    inputs:
+      clay: 3
+      water: 1
+    outputs:
+      pottery: 1
+    time_cost: 2.5
+    skill_requirements:
+      crafting: 1
+    tool_requirements: []
+    skill_bonuses:
+      crafting: 0.1
+
+  - id: preserved_fish
+    name: Preserved Fish
+    inputs:
+      fish: 2
+      salt: 1
+    outputs:
+      preserved_fish: 2
+    time_cost: 1.5
+    skill_requirements:
+      cooking: 1
+    tool_requirements: []
+    skill_bonuses:
+      cooking: 0.1
+    food_value: 30
+
+  - id: herbal_medicine
+    name: Herbal Medicine
+    inputs:
+      herbs: 3
+      water: 1
+    outputs:
+      medicine: 1
+    time_cost: 3.0
+    skill_requirements:
+      herbalism: 2
+    tool_requirements: []
+    skill_bonuses:
+      herbalism: 0.2
+
+  - id: shelter_materials
+    name: Shelter Materials
+    inputs:
+      plank: 4
+      rope: 2
+    outputs:
+      shelter_kit: 1
+    time_cost: 4.0
+    skill_requirements:
+      building: 2
+    tool_requirements:
+      - simple_tool
+    skill_bonuses:
+      building: 0.15
+
+  - id: jewelry
+    name: Jewelry
+    inputs:
+      gems: 1
+      shells: 3
+    outputs:
+      jewelry: 1
+    time_cost: 3.0
+    skill_requirements:
+      crafting: 3
+    tool_requirements: []
+    skill_bonuses:
+      crafting: 0.25
+
+consumption:
+  food_items:
+    - fish
+    - berries
+    - grain
+    - bread
+    - preserved_fish
+    - mushrooms
+  shelter_items:
+    - shelter_kit
