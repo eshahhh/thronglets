@@ -72,11 +72,266 @@ class DummyActionProvider(AgentActionProvider):
         return IdleAction(agent_id=agent_id, reason="No action chosen")
 
 
+class DemoActionProvider(AgentActionProvider):
+    
+    REASONING_TEMPLATES = {
+        "MOVE": [
+            "I need to explore new areas to find better resources.",
+            "The market in {destination} might have better trading opportunities.",
+            "Moving to {destination} to meet other agents and trade.",
+            "Resources are depleted here, seeking better harvesting spots.",
+            "Following other agents to {destination} for potential collaboration.",
+        ],
+        "HARVEST": [
+            "Gathering {resource} to build up my inventory.",
+            "This location has abundant {resource}, perfect for harvesting.",
+            "Need {resource} for upcoming trades with other agents.",
+            "Focusing on {resource} collection as my specialty.",
+            "Stocking up on {resource} before prices fluctuate.",
+        ],
+        "TRADE_PROPOSAL": [
+            "Proposing a fair trade to {target} - I have surplus {offered}.",
+            "Looking to exchange {offered} for {requested} with {target}.",
+            "Strategic trade with {target} to diversify my resources.",
+            "Building a trading relationship with {target}.",
+            "Offering {offered} which is abundant here for {requested} which is scarce.",
+        ],
+        "ACCEPT_TRADE": [
+            "This trade benefits both parties - accepting.",
+            "The exchange rate is favorable, accepting the proposal.",
+            "Building trust with this trading partner.",
+            "This trade completes my resource needs.",
+            "Fair deal, accepting to maintain good relations.",
+        ],
+        "MESSAGE": [
+            "Communicating market conditions to {recipient}.",
+            "Sharing information about resource availability.",
+            "Negotiating future trade terms with {recipient}.",
+            "Building social connections for future cooperation.",
+            "Warning {recipient} about resource scarcity in our area.",
+        ],
+        "CRAFT": [
+            "Crafting {recipe} to add value to raw materials.",
+            "Creating {recipe} for trade - higher margins than raw goods.",
+            "Specializing in {recipe} production for the market.",
+            "Converting surplus materials into useful {recipe}.",
+            "Crafting to fulfill orders from other agents.",
+        ],
+        "GROUP_ACTION": [
+            "Forming a coalition to coordinate resource management.",
+            "Joining {group} to gain collective bargaining power.",
+            "Proposing new rules for fair resource distribution.",
+            "Voting on governance matters for our community.",
+            "Contributing to group treasury for shared projects.",
+        ],
+        "IDLE": [
+            "Observing market conditions before making decisions.",
+            "Resting to recover energy for upcoming activities.",
+            "Waiting for better trading opportunities.",
+            "Planning next moves based on current resources.",
+            "No immediate action needed, conserving resources.",
+        ],
+    }
+    
+    RESOURCES = ["grain", "wood", "stone", "iron", "hay", "wool", "cloth", "tools", "food", "gold"]
+    RECIPES = ["bread", "tools", "cloth", "furniture", "weapons", "medicine", "pottery"]
+    MESSAGES = [
+        "Anyone interested in trading grain?",
+        "Looking for wood suppliers",
+        "Offering tools at fair prices",
+        "Market update: stone prices rising",
+        "Seeking partners for a trading venture",
+        "Warning: resources depleting in the east",
+        "Proposal for shared harvesting schedule",
+        "Anyone need cloth? I have surplus.",
+        "Looking to form a crafters guild",
+        "Trade complete! Good doing business.",
+    ]
+    
+    def __init__(self, location_graph, agent_manager, agent_types=None):
+        self.location_graph = location_graph
+        self.agent_manager = agent_manager
+        self._rng = random.Random()
+        self._agent_types = agent_types or {}
+        self._pending_trades = {}
+        self._trade_counter = 0
+        self._last_reasoning = {}
+        
+    def set_seed(self, seed):
+        self._rng = random.Random(seed)
+        
+    def get_last_action_metadata(self, agent_id):
+        return {"reasoning": self._last_reasoning.get(agent_id, "")}
+        
+    def _get_reasoning(self, action_type, **kwargs):
+        templates = self.REASONING_TEMPLATES.get(action_type, self.REASONING_TEMPLATES["IDLE"])
+        template = self._rng.choice(templates)
+        try:
+            return template.format(**kwargs)
+        except KeyError:
+            return template
+    
+    def get_action(self, agent_id, tick):
+        from core.actions.action_schema import (
+            IdleAction, MoveAction, HarvestAction, CraftAction,
+            MessageAction, TradeProposalAction, AcceptTradeAction,
+            GroupAction, GroupActionType, TradeItem
+        )
+        
+        agent = self.agent_manager.get_agent(agent_id)
+        if not agent:
+            return IdleAction(agent_id=agent_id, reason="Agent not found")
+        
+        agent_type = self._agent_types.get(agent_id, "generalist")
+        
+        weights = self._get_action_weights(agent_type, tick)
+        action_roll = self._rng.random()
+        cumulative = 0
+        chosen_action = "IDLE"
+        
+        for action, weight in weights.items():
+            cumulative += weight
+            if action_roll < cumulative:
+                chosen_action = action
+                break
+        
+        if chosen_action == "MOVE":
+            neighbors = self.location_graph.get_neighbors(agent.location)
+            if neighbors:
+                destination = self._rng.choice(neighbors)
+                self._last_reasoning[agent_id] = self._get_reasoning("MOVE", destination=destination)
+                return MoveAction(agent_id=agent_id, destination=destination)
+                
+        elif chosen_action == "HARVEST":
+            location = self.location_graph.get_node(agent.location)
+            if location and location.resource_richness:
+                available = [r for r, amt in location.resource_richness.items() if amt > 0]
+                if available:
+                    resource = self._rng.choice(available)
+                    amount = self._rng.randint(1, 5)
+                    self._last_reasoning[agent_id] = self._get_reasoning("HARVEST", resource=resource)
+                    return HarvestAction(agent_id=agent_id, resource_type=resource, amount=amount)
+                    
+        elif chosen_action == "TRADE_PROPOSAL":
+            other_agents = [a.id for a in self.agent_manager.list_agents() 
+                          if a.id != agent_id and a.location == agent.location]
+            if other_agents:
+                target = self._rng.choice(other_agents)
+                offered_resource = self._rng.choice(self.RESOURCES[:5])
+                requested_resource = self._rng.choice(self.RESOURCES[:5])
+                offered_qty = self._rng.randint(1, 10)
+                requested_qty = self._rng.randint(1, 10)
+                
+                self._trade_counter += 1
+                proposal_id = f"demo_trade_{self._trade_counter}"
+                self._pending_trades[proposal_id] = {
+                    "proposer": agent_id,
+                    "target": target,
+                    "offered": [(offered_resource, offered_qty)],
+                    "requested": [(requested_resource, requested_qty)],
+                }
+                
+                self._last_reasoning[agent_id] = self._get_reasoning(
+                    "TRADE_PROPOSAL", 
+                    target=target, 
+                    offered=offered_resource, 
+                    requested=requested_resource
+                )
+                return TradeProposalAction(
+                    agent_id=agent_id,
+                    target_agent_id=target,
+                    offered_items=[TradeItem(item_type=offered_resource, quantity=offered_qty)],
+                    requested_items=[TradeItem(item_type=requested_resource, quantity=requested_qty)],
+                    proposal_id=proposal_id,
+                )
+                
+        elif chosen_action == "ACCEPT_TRADE":
+            for pid, trade in list(self._pending_trades.items()):
+                if trade["target"] == agent_id:
+                    del self._pending_trades[pid]
+                    self._last_reasoning[agent_id] = self._get_reasoning("ACCEPT_TRADE")
+                    return AcceptTradeAction(
+                        agent_id=agent_id,
+                        proposal_id=pid,
+                        accept=self._rng.random() > 0.2,
+                    )
+                    
+        elif chosen_action == "MESSAGE":
+            other_agents = [a.id for a in self.agent_manager.list_agents() if a.id != agent_id]
+            if other_agents:
+                recipient = self._rng.choice(other_agents)
+                content = self._rng.choice(self.MESSAGES)
+                self._last_reasoning[agent_id] = self._get_reasoning("MESSAGE", recipient=recipient)
+                return MessageAction(
+                    agent_id=agent_id,
+                    recipient_id=recipient,
+                    channel="direct",
+                    content=content,
+                )
+                
+        elif chosen_action == "CRAFT":
+            recipe = self._rng.choice(self.RECIPES)
+            self._last_reasoning[agent_id] = self._get_reasoning("CRAFT", recipe=recipe)
+            return CraftAction(agent_id=agent_id, recipe_id=recipe, quantity=1)
+            
+        elif chosen_action == "GROUP_ACTION":
+            group_type = self._rng.choice([
+                GroupActionType.FORM_GROUP,
+                GroupActionType.JOIN_GROUP,
+                GroupActionType.VOTE,
+            ])
+            self._last_reasoning[agent_id] = self._get_reasoning("GROUP_ACTION", group="community")
+            return GroupAction(
+                agent_id=agent_id,
+                group_action_type=group_type,
+                group_id=f"group_{self._rng.randint(1, 5)}",
+                payload={"action": "demo"},
+            )
+        
+        self._last_reasoning[agent_id] = self._get_reasoning("IDLE")
+        return IdleAction(agent_id=agent_id, reason="Observing the situation")
+    
+    def _get_action_weights(self, agent_type, tick):
+        base_weights = {
+            "MOVE": 0.15,
+            "HARVEST": 0.30,
+            "TRADE_PROPOSAL": 0.15,
+            "ACCEPT_TRADE": 0.10,
+            "MESSAGE": 0.10,
+            "CRAFT": 0.10,
+            "GROUP_ACTION": 0.05,
+            "IDLE": 0.05,
+        }
+        
+        type_modifiers = {
+            "farmer": {"HARVEST": 0.20, "TRADE_PROPOSAL": -0.05},
+            "trader": {"TRADE_PROPOSAL": 0.15, "MESSAGE": 0.10, "HARVEST": -0.15},
+            "crafter": {"CRAFT": 0.20, "HARVEST": 0.05, "TRADE_PROPOSAL": -0.05},
+            "gatherer": {"HARVEST": 0.15, "MOVE": 0.10, "CRAFT": -0.10},
+            "leader": {"GROUP_ACTION": 0.15, "MESSAGE": 0.10, "HARVEST": -0.15},
+            "specialist": {"CRAFT": 0.15, "TRADE_PROPOSAL": 0.10, "HARVEST": -0.10},
+            "cooperator": {"MESSAGE": 0.10, "GROUP_ACTION": 0.10, "TRADE_PROPOSAL": 0.05},
+            "opportunist": {"TRADE_PROPOSAL": 0.15, "MOVE": 0.10, "IDLE": -0.05},
+        }
+        
+        weights = base_weights.copy()
+        if agent_type in type_modifiers:
+            for action, mod in type_modifiers[agent_type].items():
+                weights[action] = max(0, weights[action] + mod)
+        
+        total = sum(weights.values())
+        return {k: v / total for k, v in weights.items()}
+    
+    def initialize_all_agents(self):
+        pass
+
+
 class SimulationManager:
-    def __init__(self, config_dir=None, use_llm=False, output_dir="output"):
+    def __init__(self, config_dir=None, use_llm=False, output_dir="output", demo_mode=False):
         self.config_dir = config_dir
         self.use_llm = use_llm
         self.output_dir = output_dir
+        self.demo_mode = demo_mode
         
         self.world_config = None
         self.simulation_config = None
@@ -268,7 +523,15 @@ class SimulationManager:
         self.group_manager = GroupManager(self.agent_manager)
         self.governance_system = GovernanceSystem(self.group_manager)
 
-        if self.use_llm:
+        if self.demo_mode:
+            self.action_provider = DemoActionProvider(
+                location_graph=self.location_graph,
+                agent_manager=self.agent_manager,
+                agent_types=self._agent_types,
+            )
+            if self.simulation_config.random_seed:
+                self.action_provider.set_seed(self.simulation_config.random_seed)
+        elif self.use_llm:
             self._setup_llm_components()
         else:
             self.action_provider = DummyActionProvider(

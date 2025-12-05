@@ -36,9 +36,10 @@ function saveCachedConfig(config) {
   }
 }
 
-function SetupScreen({ onStart }) {
+function SetupScreen({ onStart, onStartDemo }) {
   const [config, setConfig] = useState(loadCachedConfig)
   const [loading, setLoading] = useState(false)
+  const [loadingDemo, setLoadingDemo] = useState(false)
   const [error, setError] = useState('')
   
   const handleUseDefaults = () => {
@@ -61,6 +62,17 @@ function SetupScreen({ onStart }) {
     } catch (err) {
       setError(err.message || 'Failed to start simulation')
       setLoading(false)
+    }
+  }
+  
+  const handleStartDemo = async () => {
+    setError('')
+    setLoadingDemo(true)
+    try {
+      await onStartDemo()
+    } catch (err) {
+      setError(err.message || 'Failed to start demo')
+      setLoadingDemo(false)
     }
   }
   
@@ -125,10 +137,28 @@ function SetupScreen({ onStart }) {
             <button 
               className="btn btn-primary btn-large" 
               onClick={handleStart}
-              disabled={loading}
+              disabled={loading || loadingDemo}
             >
               {loading ? 'Starting...' : 'Start Simulation'}
             </button>
+          </div>
+          
+          <div className="setup-divider">
+            <span>or</span>
+          </div>
+          
+          <div className="demo-section">
+            <button 
+              className="btn btn-demo btn-large" 
+              onClick={handleStartDemo}
+              disabled={loading || loadingDemo}
+            >
+              {loadingDemo ? 'Starting Demo...' : 'View Demo'}
+            </button>
+            <p className="demo-hint">
+              <strong>Demo Mode:</strong> Simulates 100 agents for 100 ticks with realistic fake events. 
+              No LLM calls will be made.
+            </p>
           </div>
         </div>
         
@@ -145,7 +175,7 @@ function SetupScreen({ onStart }) {
   )
 }
 
-function SimulationView({ state, metrics, events, connected }) {
+function SimulationView({ state, metrics, events, connected, demoMode }) {
   const [selectedAgent, setSelectedAgent] = useState(null)
   const [showStats, setShowStats] = useState(false)
   
@@ -157,6 +187,12 @@ function SimulationView({ state, metrics, events, connected }) {
     <div className="app">
       <header className="header">
         <h1>Thronglets</h1>
+        {demoMode && (
+          <div className="demo-badge">
+            <span>DEMO MODE</span>
+            <small>Simulated data - No LLM calls</small>
+          </div>
+        )}
         
         <div className="header-controls">
           <div className="header-stats">
@@ -215,6 +251,7 @@ function SimulationView({ state, metrics, events, connected }) {
 
 function App() {
   const [simulationStarted, setSimulationStarted] = useState(false)
+  const [demoMode, setDemoMode] = useState(false)
   const [state, setState] = useState(null)
   const [metrics, setMetrics] = useState(null)
   const [events, setEvents] = useState([])
@@ -225,21 +262,37 @@ function App() {
   useEffect(() => {
     if (!lastMessage) return
     
-    if (lastMessage.type === 'tick') {
-      const { state: newState, metrics: newMetrics, events: newEvents } = lastMessage.data
-      setState(newState)
+    const handleTickMessage = (data) => {
+      const { state: newState, metrics: newMetrics, events: newEvents, demoMode: isDemoMode } = data
+
+      if (newState) {
+        setState(newState)
+      }
+
       if (newMetrics) setMetrics(newMetrics)
       if (newEvents) setEvents(newEvents)
-      if (!simulationStarted && newState?.running) {
-        setSimulationStarted(true)
-      }
-    } else if (lastMessage.type === 'state') {
-      setState(lastMessage.data)
-      if (!simulationStarted && lastMessage.data.running) {
+      if (isDemoMode !== undefined) setDemoMode(isDemoMode)
+
+      if (newState?.running) {
         setSimulationStarted(true)
       }
     }
-  }, [lastMessage, simulationStarted])
+    
+    const handleStateMessage = (newState) => {
+      if (newState) {
+        setState(newState)
+        if (newState.running) {
+          setSimulationStarted(true)
+        }
+      }
+    }
+    
+    if (lastMessage.type === 'tick') {
+      handleTickMessage(lastMessage.data)
+    } else if (lastMessage.type === 'state') {
+      handleStateMessage(lastMessage.data)
+    }
+  }, [lastMessage])
   
   const handleStartSimulation = async (config) => {
     const params = new URLSearchParams()
@@ -257,11 +310,26 @@ function App() {
     const metricsData = await api.get('/api/metrics')
     setMetrics(metricsData)
     
+    setDemoMode(false)
+    setSimulationStarted(true)
+  }
+  
+  const handleStartDemo = async () => {
+    await api.post('/api/simulation/demo?agent_count=100&max_ticks=100')
+    
+    await api.post('/api/simulation/start')
+    
+    const stateData = await api.get('/api/state')
+    setState(stateData)
+    const metricsData = await api.get('/api/metrics')
+    setMetrics(metricsData)
+    
+    setDemoMode(true)
     setSimulationStarted(true)
   }
   
   if (!simulationStarted) {
-    return <SetupScreen onStart={handleStartSimulation} />
+    return <SetupScreen onStart={handleStartSimulation} onStartDemo={handleStartDemo} />
   }
   
   if (!state) {
@@ -278,6 +346,7 @@ function App() {
       metrics={metrics}
       events={events}
       connected={connected}
+      demoMode={demoMode}
     />
   )
 }

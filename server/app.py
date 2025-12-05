@@ -161,11 +161,41 @@ def create_app():
         
         return {"status": "initialized", "agentCount": agent_count}
         
+    @app.post("/api/simulation/demo")
+    async def initialize_demo_simulation(agent_count: int = Query(100, ge=2, le=200), max_ticks: int = Query(100, ge=10, le=1000)):
+        global simulation
+        if simulation:
+            simulation.cleanup()
+        
+        simulation = SimulationManager(use_llm=False, demo_mode=True)
+        simulation.initialize(agent_count=agent_count)
+        
+        def on_tick(sim, tick, stats):
+            state = sim.get_state()
+            metrics = sim.get_metrics()
+            events = sim.get_events(100)
+            ws_manager.broadcast_sync({
+                "type": "tick",
+                "data": {
+                    "state": state,
+                    "metrics": metrics,
+                    "events": events,
+                    "demoMode": True,
+                }
+            })
+            if tick >= max_ticks:
+                sim.pause()
+            
+        simulation.add_tick_callback(on_tick)
+        
+        return {"status": "initialized", "agentCount": agent_count, "demoMode": True, "maxTicks": max_ticks}
+        
     @app.post("/api/simulation/start")
     async def start_simulation():
         if not simulation or not simulation._initialized:
             return JSONResponse({"error": "Simulation not initialized. Call /api/simulation/initialize first."}, status_code=400)
-        simulation.start(tick_delay=1.0)
+        tick_delay = 0.1 if simulation.demo_mode else 1.0
+        simulation.start(tick_delay=tick_delay)
         return {"status": "started"}
         
     @app.websocket("/ws")
