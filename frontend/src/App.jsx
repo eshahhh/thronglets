@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from 'react'
-import { BarChart3 } from 'lucide-react'
+import { Link } from 'react-router-dom'
+import { BarChart3, BookOpen } from 'lucide-react'
 import GameMap from './components/GameMap'
 import Sidebar from './components/Sidebar'
 import StatsOverlay from './components/StatsOverlay'
@@ -160,6 +161,13 @@ function SetupScreen({ onStart, onStartDemo }) {
               No LLM calls will be made.
             </p>
           </div>
+          
+          <div className="docs-link">
+            <Link to="/docs" className="btn btn-link">
+              <BookOpen size={16} />
+              Read Documentation
+            </Link>
+          </div>
         </div>
         
         <div className="setup-info">
@@ -216,6 +224,9 @@ function SimulationView({ state, metrics, events, connected, demoMode }) {
             </div>
           </div>
           
+          <Link to="/docs" className="btn btn-icon" title="Documentation">
+            <BookOpen size={16} />
+          </Link>
           <button className="btn btn-icon" onClick={() => setShowStats(true)} title="Statistics">
             <BarChart3 size={16} />
           </button>
@@ -256,8 +267,8 @@ function App() {
   const [metrics, setMetrics] = useState(null)
   const [events, setEvents] = useState([])
   
-  const { connected, lastMessage } = useWebSocket('ws://localhost:8000/ws')
-  const api = useApi('http://localhost:8000')
+  const { connected, lastMessage } = useWebSocket('wss://thronglets-server.eshahhh.hackclub.app/ws')
+  const api = useApi('https://thronglets-server.eshahhh.hackclub.app')
   
   useEffect(() => {
     if (!lastMessage) return
@@ -329,7 +340,9 @@ function App() {
   }
   
   if (!simulationStarted) {
-    return <SetupScreen onStart={handleStartSimulation} onStartDemo={handleStartDemo} />
+    return (
+      <SetupScreen onStart={handleStartSimulation} onStartDemo={handleStartDemo} />
+    )
   }
   
   if (!state) {

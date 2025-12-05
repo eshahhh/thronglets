@@ -440,6 +440,15 @@ class SimulationManager:
             "Ada", "Basil", "Cora", "Dane", "Ella", "Finn", "Gwen", "Hugo",
             "Iris", "Joel", "Kira", "Liam", "Maya", "Noel", "Opal", "Paul",
             "Quinn", "Rosa", "Seth", "Tara", "Umar", "Vera", "Wade", "Xena",
+            "Yara", "Zane", "Alma", "Bram", "Cleo", "Drew", "Enzo", "Faye",
+            "Gus", "Hana", "Ivan", "Jade", "Knox", "Luna", "Milo", "Nina",
+            "Omar", "Pia", "Remy", "Sage", "Theo", "Uma", "Vince", "Wren",
+            "Xander", "Yuki", "Zara", "Axel", "Bella", "Cruz", "Dara", "Emil",
+            "Flora", "Grant", "Hope", "Ines", "Juno", "Kai", "Lena", "Max",
+            "Nadia", "Otto", "Petra", "Quinn", "Rio", "Soren", "Tess", "Uri",
+            "Viola", "Will", "Xia", "Yosef", "Zoe", "Anton", "Blair", "Cyrus",
+            "Diana", "Elio", "Freya", "Grey", "Hazel", "Ilya", "Jules", "Koda",
+            "Lyra", "Nash", "Olive", "Pax", "Rey", "Shay", "Tatum", "Ulric",
         ]
         
         type_weights = {
